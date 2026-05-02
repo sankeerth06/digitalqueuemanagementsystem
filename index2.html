@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickServe — Multi-Stall Token System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090f;
+    --surface: #111119;
+    --card: #18181f;
+    --card2: #1e1e28;
+    --border: #28283a;
+    --accent: #f97316;
+    --accent2: #fb923c;
+    --green: #22c55e;
+    --blue: #6366f1;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --purple: #a855f7;
+    --text: #f0eff8;
+    --muted: #64648a;
+    --muted2: #9494b8;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .page { display: none; min-height: 100vh; flex-direction: column; }
+  .page.active { display: flex; }
+
+  /* NAVBAR */
+  .navbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 28px; border-bottom: 1px solid var(--border);
+    background: rgba(9,9,15,0.85); backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 200;
+  }
+  .nav-brand {
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 19px;
+    color: var(--accent); cursor: pointer; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;
+  }
+  .nav-links { display: flex; gap: 8px; align-items: center; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 11px 22px; border-radius: 100px; border: none;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 7px;
+    text-decoration: none; white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 0 28px #f9731628; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 44px #f9731650; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-ghost { background: var(--card2); color: var(--muted2); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .btn-sm { padding: 7px 14px; font-size: 11px; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-green:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-red:hover { opacity: 0.9; }
+  .btn-blue { background: var(--blue); color: #fff; }
+  .btn-blue:hover { opacity: 0.9; }
+  .btn-purple { background: var(--purple); color: #fff; }
+  .btn-purple:hover { opacity: 0.9; }
+  .btn-full { width: 100%; justify-content: center; font-size: 14px; padding: 14px; }
+
+  /* FORMS */
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 7px; font-weight: 500; letter-spacing: 0.8px; text-transform: uppercase; }
+  .form-control {
+    width: 100%; padding: 13px 15px;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 11px; color: var(--text); font-size: 14px;
+    font-family: 'DM Sans', sans-serif; outline: none; transition: all 0.2s;
+  }
+  .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #f9731615; }
+  .form-control::placeholder { color: var(--muted); }
+  select.form-control option { background: var(--card2); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media(max-width:520px) { .form-row { grid-template-columns: 1fr; } }
+
+  /* CONTENT */
+  .content { flex: 1; padding: 32px 24px; max-width: 1040px; margin: 0 auto; width: 100%; }
+
+  /* SECTION HEADERS */
+  .section-title { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+  .section-sub { color: var(--muted); font-size: 13px; margin-bottom: 26px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+
+  /* STATUS BADGES */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 13px; border-radius: 100px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+  }
+  .sb-waiting   { background: #f59e0b15; color: var(--yellow); border: 1px solid #f59e0b30; }
+  .sb-preparing { background: #6366f115; color: var(--blue);   border: 1px solid #6366f130; }
+  .sb-ready     { background: #22c55e15; color: var(--green);  border: 1px solid #22c55e30; }
+  .sb-served    { background: #64648a15; color: var(--muted);  border: 1px solid var(--border); }
+  .sb-cancelled { background: #ef444415; color: var(--red);    border: 1px solid #ef444430; }
+  .pulse { animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.35} }
+
+  /* TOAST */
+  .toast-container { position: fixed; bottom: 22px; right: 22px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; font-size: 13px;
+    animation: toastIn 0.3s; max-width: 290px; display: flex; align-items: center; gap: 8px;
+  }
+  .toast.success { border-color: #22c55e55; }
+  .toast.error { border-color: #ef444455; }
+  @keyframes toastIn { from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1} }
+
+  /* ══════════════════════════════════
+     LANDING PAGE
+  ══════════════════════════════════ */
+  #page-landing {
+    background:
+      radial-gradient(ellipse 70% 50% at 20% 20%, #f9731608 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, #6366f108 0%, transparent 55%),
+      var(--bg);
+    align-items: center; justify-content: center; text-align: center; padding: 60px 20px;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #f9731610; border: 1px solid #f9731625;
+    padding: 6px 18px; border-radius: 100px;
+    font-family: 'Syne', sans-serif; font-size: 10px; letter-spacing: 2.5px;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 32px;
+  }
+  .hero-title {
+    font-family: 'Syne', sans-serif; font-size: clamp(42px, 8vw, 84px);
+    font-weight: 800; line-height: 0.92; letter-spacing: -3px; margin-bottom: 18px;
+  }
+  .hero-title .hl { color: var(--accent); }
+  .hero-sub { font-size: 15px; color: var(--muted2); max-width: 400px; line-height: 1.65; margin: 0 auto 44px; }
+  .landing-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    max-width: 660px; margin: 0 auto;
+  }
+  @media(max-width:600px) { .landing-grid { grid-template-columns: 1fr; max-width: 360px; } }
+  .lcard {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 26px 20px; cursor: pointer;
+    transition: all 0.25s; text-align: left; position: relative; overflow: hidden;
+  }
+  .lcard::before {
+    content: ''; position: absolute; inset: 0; border-radius: 20px;
+    background: linear-gradient(135deg, transparent, rgba(255,255,255,0.02));
+    opacity: 0; transition: opacity 0.25s;
+  }
+  .lcard:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 16px 40px #00000050; }
+  .lcard:hover::before { opacity: 1; }
+  .lcard .lc-icon { font-size: 28px; margin-bottom: 12px; }
+  .lcard h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; margin-bottom: 5px; }
+  .lcard p { font-size: 12px; color: var(--muted); line-height: 1.55; }
+  .lcard .lc-arrow { display: inline-block; margin-top: 14px; font-size: 12px; color: var(--accent); font-weight: 700; }
+
+  /* ══════════════════════════════════
+     STALL PICKER (customer flow step 1)
+  ══════════════════════════════════ */
+  #page-stall-pick { background: var(--bg); }
+  .stall-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;
+  }
+  .stall-pick-card {
+    background: var(--card); border: 2px solid var(--border);
+    border-radius: 18px; padding: 22px 20px; cursor: pointer;
+    transition: all 0.22s; position: relative; overflow: hidden;
+  }
+  .stall-pick-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 12px 32px #0009; }
+  .stall-pick-card.selected { border-color: var(--accent); background: var(--card2); }
+  .sp-name { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+  .sp-desc { font-size: 12px; color: var(--muted); }
+  .sp-tag { display: inline-block; margin-top: 10px; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 100px; letter-spacing: 0.5px; }
+  .sp-count { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .stall-icon { font-size: 32px; margin-bottom: 12px; }
+
+  /* ══════════════════════════════════
+     CUSTOMER FORM
+  ══════════════════════════════════ */
+  #page-customer { background: var(--bg); }
+  .form-card { background: var(--card); border: 1px solid var(--border); border-radius: 22px; padding: 32px; max-width: 500px; }
+  .stall-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #f9731612; border: 1px solid #f9731625;
+    padding: 6px 14px; border-radius: 100px; font-size: 12px;
+    color: var(--accent); font-weight: 600; margin-bottom: 20px;
+  }
+
+  /* ══════════════════════════════════
+     QR / TOKEN PAGE
+  ══════════════════════════════════ */
+  #page-qr { background: var(--bg); align-items: center; }
+  .qr-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 26px; padding: 36px 32px; text-align: center;
+    max-width: 420px; width: 100%; margin: 0 auto;
+  }
+  .qr-stall-name { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  .token-number { font-family: 'Syne', sans-serif; font-size: 78px; font-weight: 800; color: var(--accent); line-height: 1; margin: 12px 0; }
+  .qr-wrapper { background: #fff; border-radius: 14px; padding: 16px; display: inline-block; margin: 14px 0; }
+  .timer { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .timer span { color: var(--accent); font-weight: 700; }
+  .detail-row { text-align: left; margin-top: 20px; }
+  .detail-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+  .detail-name { font-weight: 700; font-size: 15px; }
+  .detail-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ══════════════════════════════════
+     REGISTER STALL
+  ══════════════════════════════════ */
+  #page-register { 
+    background:
+      radial-gradient(ellipse 60% 40% at 80% 20%, #a855f710 0%, transparent 55%),
+      var(--bg);
+    align-items: center; justify-content: center;
+  }
+  .register-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 26px; padding: 40px; max-width: 480px; width: 100%; margin: 24px;
+  }
+  .register-card .rc-icon { font-size: 40px; margin-bottom: 18px; }
+  .cred-reveal {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-top: 20px; text-align: center;
+  }
+  .cred-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .cred-row:last-child { border: none; }
+  .cred-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .cred-val { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; color: var(--accent); }
+  .cred-id-val { font-family: monospace; font-size: 13px; color: var(--purple); letter-spacing: 1px; }
+
+  /* ══════════════════════════════════
+     ADMIN LOGIN
+  ══════════════════════════════════ */
+  #page-admin-login {
+    align-items: center; justify-content: center;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 0%, #6366f110 0%, transparent 60%),
+      var(--bg);
+  }
+  .login-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 26px; padding: 40px; max-width: 400px; width: 100%; margin: 24px;
+  }
+  .login-card .lock-icon { font-size: 40px; margin-bottom: 18px; }
+  .login-card h2 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; margin-bottom: 5px; }
+  .login-card p { font-size: 13px; color: var(--muted); margin-bottom: 26px; }
+  .error-msg { font-size: 12px; color: var(--red); margin-top: -10px; margin-bottom: 14px; display: none; }
+  .stall-login-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 14px; }
+
+  /* ══════════════════════════════════
+     STAFF DASHBOARD
+  ══════════════════════════════════ */
+  #page-staff { background: var(--bg); }
+  .dash-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    flex-wrap: wrap; gap: 14px; margin-bottom: 26px;
+  }
+  .stall-info-bar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 18px;
+  }
+  .stall-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .stall-info-name { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; }
+  .stall-info-id { font-size: 11px; color: var(--muted); font-family: monospace; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 26px; }
+  @media(max-width:640px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px;
+  }
+  .stat-val { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .tabs { display: flex; gap: 4px; background: var(--card); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    flex: 1; min-width: 60px; padding: 8px 6px; text-align: center; border-radius: 7px;
+    cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;
+    color: var(--muted); border: none; background: transparent; font-family: 'DM Sans', sans-serif;
+  }
+  .tab.active { background: var(--accent); color: #fff; }
+
+  .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 13px; }
+  .token-card {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; transition: all 0.2s;
+  }
+  .token-card:hover { border-color: #f9731640; }
+  .token-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .token-num { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--accent); }
+  .token-meta { font-size: 12px; color: var(--muted2); margin-bottom: 12px; line-height: 1.85; }
+  .token-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); grid-column: 1/-1; }
+  .empty-state .ei { font-size: 38px; margin-bottom: 10px; }
+
+  /* NOW SERVING */
+  .now-serving {
+    background: linear-gradient(135deg, #f9731612, #6366f108);
+    border: 1px solid #f9731625; border-radius: var(--radius);
+    padding: 20px 24px; text-align: center; margin-bottom: 22px;
+    display: none;
+  }
+  .counter-display { font-family: 'Syne', sans-serif; font-size: 66px; font-weight: 800; color: var(--accent); line-height: 1; margin: 6px 0; }
+
+  /* SCAN PAGE */
+  #page-scan { background: var(--bg); }
+  .scan-box {
+    background: var(--card); border: 2px dashed var(--border);
+    border-radius: 20px; padding: 44px 28px; text-align: center; margin-bottom: 20px;
+  }
+  .manual-row { display: flex; gap: 10px; margin-top: 18px; }
+  .manual-row .form-control { flex: 1; }
+
+  /* COLOR TAGS */
+  .tag-orange { background: #f9731620; color: var(--accent); }
+  .tag-blue   { background: #6366f120; color: var(--blue); }
+  .tag-green  { background: #22c55e20; color: var(--green); }
+  .tag-purple { background: #a855f720; color: var(--purple); }
+  .tag-yellow { background: #f59e0b20; color: var(--yellow); }
+  .tag-red    { background: #ef444420; color: var(--red); }
+
+  @media print {
+    .navbar, .btn, .nav-links { display: none !important; }
+    body { background: #fff; color: #000; }
+    .qr-card { border: 2px solid #ddd; }
+    .token-number { color: #f97316; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ████ LANDING ████ -->
+<div id="page-landing" class="page active">
+  <div class="hero-badge">⚡ QuickServe — Multi-Stall</div>
+  <h1 class="hero-title">One App.<br><span class="hl">Every</span> Stall.</h1>
+  <p class="hero-sub">Register your stall, get unique credentials. Customers pick your stall and get their token instantly.</p>
+  <div class="landing-grid">
+    <div class="lcard" onclick="goTo('page-stall-pick')">
+      <div class="lc-icon">📱</div>
+      <h3>Get Token</h3>
+      <p>Pick a stall and get your token in seconds.</p>
+      <span class="lc-arrow">Customer →</span>
+    </div>
+    <div class="lcard" onclick="goTo('page-register')">
+      <div class="lc-icon">🏪</div>
+      <h3>Register Stall</h3>
+      <p>Add your stall and get a unique admin login.</p>
+      <span class="lc-arrow">Register →</span>
+    </div>
+    <div class="lcard" onclick="goTo('page-admin-login')">
+      <div class="lc-icon">🔐</div>
+      <h3>Staff Login</h3>
+      <p>Manage your stall's orders with your credentials.</p>
+      <span class="lc-arrow">Login →</span>
+    </div>
+  </div>
+</div>
+
+<!-- ████ STALL PICKER ████ -->
+<div id="page-stall-pick" class="page">
+  <nav class="navbar">
+    <div class="nav-brand" onclick="goTo('page-landing')">⚡ QuickServe</div>
+    <div class="nav-links">
+      <button class="btn btn-sm btn-outline" onclick="goTo('page-landing')">← Home</button>
+    </div>
+  </nav>
+  <div class="content">
+    <div class="section-title">Choose a Stall</div>
+    <div class="section-sub" id="stall-pick-sub">Select the stall you want to place an order at.</div>
+    <div class="stall-grid" id="stall-pick-grid"></div>
+  </div>
+</div>
+
+<!-- ████ CUSTOMER FORM ████ -->
+<div id="page-customer" class="page">
+  <nav class="navbar">
+    <div class="nav-brand" onclick="goTo('page-landing')">⚡ QuickServe</div>
+    <div class="nav-links">
+      <button class="btn btn-sm btn-outline" onclick="goTo('page-stall-pick')">← Stalls</button>
+    </div>
+  </nav>
+  <div class="content" style="max-width:560px;">
+    <div class="stall-chip" id="cust-stall-chip">🏪 Stall Name</div>
+    <div class="section-title">Get Your Token</div>
+    <div class="section-sub">Fill in your details to generate a token.</div>
+    <div class="form-card">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Your Name *</label>
+          <input type="text" id="cust-name" class="form-control" placeholder="e.g. Ravi Kumar">
+        </div>
+        <div class="form-group">
+          <label>Mobile Number</label>
+          <input type="tel" id="cust-phone" class="form-control" placeholder="e.g. 9876543210">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Counter / Seating</label>
+        <select id="cust-counter" class="form-control">
+          <option value="Takeaway">🥡 Takeaway</option>
+          <option value="Dine In">🪑 Dine In</option>
+          <option value="Table 1">Table 1</option>
+          <option value="Table 2">Table 2</option>
+          <option value="Table 3">Table 3</option>
+          <option value="Table 4">Table 4</option>
+          <option value="Table 5">Table 5</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Special Instructions</label>
+        <input type="text" id="cust-note" class="form-control" placeholder="e.g. Less spicy, no onion">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="placeOrder()">🎟️ Generate Token</button>
+    </div>
+  </div>
+</div>
+
+<!-- ████ QR / TOKEN ████ -->
+<div id="page-qr" class="page">
+  <nav class="navbar">
+    <div class="nav-brand" onclick="goTo('page-landing')">⚡ QuickServe</div>
+    <div class="nav-links">
+      <button class="btn btn-sm btn-outline" onclick="goTo('page-stall-pick')">+ New Token</button>
+      <button class="btn btn-sm btn-outline" onclick="window.print()">🖨️ Print</button>
+    </div>
+  </nav>
+  <div class="content" style="display:flex;justify-content:center;align-items:flex-start;padding-top:32px;">
+    <div class="qr-card">
+      <div class="qr-stall-name" id="qr-stall-name">—</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:8px;">Token Number</div>
+      <div class="token-number" id="qr-token-num">—</div>
+      <div class="qr-wrapper"><div id="qrcode"></div></div>
+      <div id="qr-status" class="status-badge sb-waiting" style="margin:10px auto;display:inline-flex;">
+        <span class="pulse">⏳</span>&nbsp;Waiting
+      </div>
+      <div class="timer" id="qr-timer"></div>
+      <div class="divider"></div>
+      <div class="detail-row">
+        <div class="detail-label">Details</div>
+        <div class="detail-name" id="qr-name"></div>
+        <div class="detail-sub" id="qr-counter"></div>
+        <div class="detail-sub" id="qr-note" style="margin-top:3px;"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:20px;">Show this token at the counter</div>
+    </div>
+  </div>
+</div>
+
+<!-- ████ REGISTER STALL ████ -->
+<div id="page-register" class="page">
+  <nav class="navbar">
+    <div class="nav-brand" onclick="goTo('page-landing')">⚡ QuickServe</div>
+    <div class="nav-links">
+      <button class="btn btn-sm btn-outline" onclick="goTo('page-landing')">← Home</button>
+    </div>
+  </nav>
+  <div class="content" style="display:flex;justify-content:center;align-items:flex-start;padding-top:24px;">
+    <div class="register-card" id="register-form-wrap">
+      <div class="rc-icon">🏪</div>
+      <div class="section-title">Register Your Stall</div>
+      <div class="section-sub" style="margin-bottom:22px;">Create your stall and get a unique Admin ID &amp; Password.</div>
+      <div class="form-group">
+        <label>Stall Name *</label>
+        <input type="text" id="reg-name" class="form-control" placeholder="e.g. Spice Garden, Tea Corner">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="reg-desc" class="form-control" placeholder="e.g. South Indian Snacks & Beverages">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Stall Icon (emoji)</label>
+          <input type="text" id="reg-icon" class="form-control" placeholder="🍜" maxlength="4">
+        </div>
+        <div class="form-group">
+          <label>Stall Color</label>
+          <select id="reg-color" class="form-control">
+            <option value="orange">🟠 Orange</option>
+            <option value="blue">🔵 Blue</option>
+            <option value="green">🟢 Green</option>
+            <option value="purple">🟣 Purple</option>
+            <option value="yellow">🟡 Yellow</option>
+            <option value="red">🔴 Red</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Your Admin Password *</label>
+        <input type="password" id="reg-pass" class="form-control" placeholder="Choose a password (min 4 chars)">
+      </div>
+      <button class="btn btn-purple btn-full" onclick="registerStall()">🚀 Create Stall</button>
+    </div>
+
+    <!-- Credentials reveal (shown after registration) -->
+    <div class="register-card" id="register-success-wrap" style="display:none;">
+      <div style="font-size:44px;margin-bottom:14px;">🎉</div>
+      <div class="section-title">Stall Created!</div>
+      <div class="section-sub" style="margin-bottom:4px;">Save these credentials — you'll need them to log in.</div>
+      <div class="cred-reveal">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Your Login Credentials</div>
+        <div class="cred-row">
+          <span class="cred-lbl">Stall Name</span>
+          <span class="cred-val" id="cred-stall-name">—</span>
+        </div>
+        <div class="cred-row">
+          <span class="cred-lbl">Admin ID</span>
+          <span class="cred-id-val" id="cred-admin-id">—</span>
+        </div>
+        <div class="cred-row">
+          <span class="cred-lbl">Password</span>
+          <span class="cred-val" id="cred-admin-pass">—</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:12px;margin-bottom:22px;">📋 Screenshot or write this down. Admin ID is your unique stall identifier.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="goTo('page-admin-login')">Go to Login →</button>
+        <button class="btn btn-outline" style="flex:1;justify-content:center;" onclick="resetRegister()">Register Another</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ████ ADMIN LOGIN ████ -->
+<div id="page-admin-login" class="page">
+  <div class="login-card">
+    <div class="lock-icon">🔐</div>
+    <h2>Staff Login</h2>
+    <p>Enter your stall's Admin ID and Password to access your dashboard.</p>
+    <div class="form-group">
+      <label>Admin ID</label>
+      <input type="text" id="admin-id" class="form-control" placeholder="e.g. STALL-A1B2" style="font-family:monospace;letter-spacing:1px;">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="admin-pass" class="form-control" placeholder="Your stall password" onkeydown="if(event.key==='Enter')loginAdmin()">
+    </div>
+    <div class="error-msg" id="login-error">Invalid Admin ID or Password.</div>
+    <button class="btn btn-primary btn-full" onclick="loginAdmin()">Login →</button>
+    <button class="btn btn-outline btn-full" style="margin-top:10px;" onclick="goTo('page-landing')">← Back</button>
+    <div class="stall-login-hint">Don't have credentials? <span style="color:var(--accent);cursor:pointer;" onclick="goTo('page-register')">Register your stall →</span></div>
+  </div>
+</div>
+
+<!-- ████ STAFF DASHBOARD ████ -->
+<div id="page-staff" class="page">
+  <nav class="navbar">
+    <div class="nav-brand">⚡ QuickServe</div>
+    <div class="nav-links">
+      <button class="btn btn-sm btn-outline" onclick="goTo('page-scan')">🔍 Lookup Token</button>
+      <button class="btn btn-sm btn-red" onclick="logoutAdmin()">Logout</button>
+    </div>
+  </nav>
+  <div class="content">
+    <div class="stall-info-bar">
+      <div class="stall-dot"></div>
+      <div>
+        <div class="stall-info-name" id="dash-stall-name">—</div>
+        <div class="stall-info-id" id="dash-stall-id">—</div>
+      </div>
+      <div style="margin-left:auto;">
+        <button class="btn btn-sm btn-ghost" onclick="renderStaff()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <div class="now-serving" id="now-serving">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;">Now Serving</div>
+      <div class="counter-display" id="now-serving-num"></div>
+      <div id="now-serving-name" style="color:var(--muted);font-size:13px;"></div>
+    </div>
+
+    <div class="stats-row" id="stats-row"></div>
+
+    <div class="tabs" id="staff-tabs">
+      <button class="tab active" onclick="filterStaff('all',this)">All</button>
+      <button class="tab" onclick="filterStaff('waiting',this)">⏳ Waiting</button>
+      <button class="tab" onclick="filterStaff('preparing',this)">🔥 Preparing</button>
+      <button class="tab" onclick="filterStaff('ready',this)">✅ Ready</button>
+      <button class="tab" onclick="filterStaff('served',this)">📦 Served</button>
+    </div>
+    <div class="token-grid" id="staff-token-grid"></div>
+  </div>
+</div>
+
+<!-- ████ SCAN / LOOKUP ████ -->
+<div id="page-scan" class="page">
+  <nav class="navbar">
+    <div class="nav-brand">⚡ QuickServe</div>
+    <div class="nav-links">
+      <button class="btn btn-sm btn-outline" onclick="goTo('page-staff')">📋 Dashboard</button>
+    </div>
+  </nav>
+  <div class="content" style="max-width:520px;">
+    <div class="section-title">Token Lookup</div>
+    <div class="section-sub">Enter a token number to find and update an order.</div>
+    <div class="scan-box">
+      <div style="font-size:48px;margin-bottom:10px;">🔍</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:5px;">Enter Token Number</div>
+      <div style="font-size:12px;color:var(--muted);">Only tokens from your stall will appear</div>
+      <div class="manual-row">
+        <input type="number" id="scan-input" class="form-control" placeholder="Enter token number">
+        <button class="btn btn-primary btn-sm" onclick="lookupToken()">Search</button>
+      </div>
+    </div>
+    <div id="scan-result" style="display:none;">
+      <div class="token-card">
+        <div class="token-header">
+          <div>
+            <div style="font-size:10px;color:var(--muted);">TOKEN</div>
+            <div class="token-num" id="scan-tok-num"></div>
+          </div>
+          <div id="scan-tok-status"></div>
+        </div>
+        <div class="token-meta" id="scan-tok-meta"></div>
+        <div style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:12px;" id="scan-tok-info"></div>
+        <div class="token-actions" id="scan-tok-actions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ═══════════════════════════════════════
+// DATA LAYER
+// ═══════════════════════════════════════
+let stalls = JSON.parse(localStorage.getItem('qs_stalls') || '[]');
+let orders = JSON.parse(localStorage.getItem('qs_orders') || '[]');
+let staffFilter = 'all';
+let currentQrToken = null;
+let statusTimer = null;
+let currentAdminStallId = null; // stall ID of logged in admin
+
+const COLOR_MAP = {
+  orange: 'tag-orange', blue: 'tag-blue', green: 'tag-green',
+  purple: 'tag-purple', yellow: 'tag-yellow', red: 'tag-red'
+};
+
+function save() {
+  localStorage.setItem('qs_stalls', JSON.stringify(stalls));
+  localStorage.setItem('qs_orders', JSON.stringify(orders));
+}
+
+function genId() {
+  return 'STALL-' + Math.random().toString(36).substring(2,6).toUpperCase();
+}
+
+function getStall(stallId) {
+  return stalls.find(s => s.id === stallId);
+}
+
+function stallOrders(stallId) {
+  return orders.filter(o => o.stallId === stallId);
+}
+
+function nextTokenForStall(stallId) {
+  const existing = stallOrders(stallId);
+  if (!existing.length) return 1;
+  return Math.max(...existing.map(o => o.token)) + 1;
+}
+
+// ═══════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════
+function goTo(pageId) {
+  if (['page-staff', 'page-scan'].includes(pageId)) {
+    if (!currentAdminStallId) { goTo('page-admin-login'); return; }
+  }
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  window.scrollTo(0, 0);
+
+  if (pageId === 'page-stall-pick') renderStallPicker();
+  if (pageId === 'page-staff') renderStaff();
+  if (pageId === 'page-customer') {
+    document.getElementById('cust-name').value = '';
+    document.getElementById('cust-phone').value = '';
+    document.getElementById('cust-note').value = '';
+  }
+  if (pageId === 'page-admin-login') {
+    document.getElementById('admin-id').value = '';
+    document.getElementById('admin-pass').value = '';
+    document.getElementById('login-error').style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════
+// STALL REGISTRATION
+// ═══════════════════════════════════════
+function registerStall() {
+  const name = document.getElementById('reg-name').value.trim();
+  const desc = document.getElementById('reg-desc').value.trim();
+  const icon = document.getElementById('reg-icon').value.trim() || '🏪';
+  const color = document.getElementById('reg-color').value;
+  const pass = document.getElementById('reg-pass').value.trim();
+
+  if (!name) { toast('Stall name is required', 'error'); return; }
+  if (pass.length < 4) { toast('Password must be at least 4 characters', 'error'); return; }
+  if (stalls.find(s => s.name.toLowerCase() === name.toLowerCase())) {
+    toast('A stall with this name already exists', 'error'); return;
+  }
+
+  const id = genId();
+  const stall = { id, name, desc, icon, color, pass, createdAt: Date.now() };
+  stalls.push(stall);
+  save();
+
+  // show credentials
+  document.getElementById('cred-stall-name').textContent = name;
+  document.getElementById('cred-admin-id').textContent = id;
+  document.getElementById('cred-admin-pass').textContent = pass;
+  document.getElementById('register-form-wrap').style.display = 'none';
+  document.getElementById('register-success-wrap').style.display = 'block';
+  toast('Stall registered! 🎉', 'success');
+}
+
+function resetRegister() {
+  document.getElementById('reg-name').value = '';
+  document.getElementById('reg-desc').value = '';
+  document.getElementById('reg-icon').value = '';
+  document.getElementById('reg-pass').value = '';
+  document.getElementById('register-form-wrap').style.display = 'block';
+  document.getElementById('register-success-wrap').style.display = 'none';
+}
+
+// ═══════════════════════════════════════
+// STALL PICKER
+// ═══════════════════════════════════════
+let selectedStallId = null;
+
+function renderStallPicker() {
+  const grid = document.getElementById('stall-pick-grid');
+  const sub = document.getElementById('stall-pick-sub');
+
+  if (!stalls.length) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1;padding:80px 20px;">
+        <div class="ei">🏪</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No Stalls Yet</div>
+        <div style="margin-bottom:20px;">No stalls have been registered yet.</div>
+        <button class="btn btn-purple" onclick="goTo('page-register')">Register First Stall →</button>
+      </div>`;
+    return;
+  }
+
+  sub.textContent = `${stalls.length} stall${stalls.length > 1 ? 's' : ''} available — pick one to get your token.`;
+  grid.innerHTML = stalls.map(s => {
+    const pending = stallOrders(s.id).filter(o => ['waiting','preparing'].includes(o.status)).length;
+    const tagClass = COLOR_MAP[s.color] || 'tag-orange';
+    return `
+    <div class="stall-pick-card" onclick="selectStall('${s.id}')">
+      <div class="stall-icon">${s.icon}</div>
+      <div class="sp-name">${s.name}</div>
+      <div class="sp-desc">${s.desc || 'Order & Token System'}</div>
+      <span class="sp-tag ${tagClass}">${s.color.toUpperCase()}</span>
+      <div class="sp-count">${pending > 0 ? `${pending} order${pending>1?'s':''} in queue` : 'No queue right now'}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectStall(stallId) {
+  selectedStallId = stallId;
+  const stall = getStall(stallId);
+  document.getElementById('cust-stall-chip').textContent = stall.icon + ' ' + stall.name;
+  goTo('page-customer');
+}
+
+// ═══════════════════════════════════════
+// PLACE ORDER
+// ═══════════════════════════════════════
+function placeOrder() {
+  if (!selectedStallId) { toast('No stall selected', 'error'); return; }
+  const name = document.getElementById('cust-name').value.trim();
+  if (!name) { toast('Please enter your name', 'error'); return; }
+
+  const stall = getStall(selectedStallId);
+  const token = nextTokenForStall(selectedStallId);
+  const order = {
+    id: Date.now().toString(),
+    stallId: selectedStallId,
+    token,
+    name,
+    phone: document.getElementById('cust-phone').value.trim(),
+    counter: document.getElementById('cust-counter').value,
+    note: document.getElementById('cust-note').value.trim(),
+    status: 'waiting',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  orders.push(order);
+  save();
+  showQr(order, stall);
+  toast('Token generated! 🎉', 'success');
+}
+
+// ═══════════════════════════════════════
+// QR PAGE
+// ═══════════════════════════════════════
+function showQr(order, stall) {
+  currentQrToken = order.id;
+  document.getElementById('qr-stall-name').textContent = stall.icon + ' ' + stall.name;
+  document.getElementById('qr-token-num').textContent = '#' + String(order.token).padStart(3, '0');
+  document.getElementById('qr-name').textContent = order.name;
+  document.getElementById('qr-counter').textContent = order.counter + (order.phone ? ' • 📞 ' + order.phone : '');
+  document.getElementById('qr-note').textContent = order.note ? '📝 ' + order.note : '';
+
+  const qrEl = document.getElementById('qrcode');
+  qrEl.innerHTML = '';
+  new QRCode(qrEl, {
+    text: JSON.stringify({ stallId: order.stallId, token: order.token, name: order.name }),
+    width: 180, height: 180,
+    colorDark: '#f97316', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-qr').classList.add('active');
+  window.scrollTo(0, 0);
+
+  updateQrStatus(order);
+  if (statusTimer) clearInterval(statusTimer);
+  statusTimer = setInterval(() => {
+    const o = orders.find(x => x.id === currentQrToken);
+    if (o) updateQrStatus(o);
+  }, 2000);
+}
+
+function updateQrStatus(order) {
+  const el = document.getElementById('qr-status');
+  const timerEl = document.getElementById('qr-timer');
+  const map = {
+    waiting:   ['sb-waiting',   '⏳', 'Waiting', true],
+    preparing: ['sb-preparing', '🔥', 'Preparing', true],
+    ready:     ['sb-ready',     '✅', 'Ready for Pickup!', false],
+    served:    ['sb-served',    '📦', 'Served', false],
+    cancelled: ['sb-cancelled', '❌', 'Cancelled', false],
+  };
+  const [cls, icon, label, pulse] = map[order.status] || ['sb-waiting','⏳','Waiting',true];
+  el.className = 'status-badge ' + cls;
+  el.innerHTML = `<span${pulse ? ' class="pulse"' : ''}>${icon}</span>&nbsp;${label}`;
+  const elapsed = Math.floor((Date.now() - order.createdAt) / 1000);
+  const m = Math.floor(elapsed / 60), s = elapsed % 60;
+  timerEl.innerHTML = `Elapsed: <span>${m}m ${s}s</span>`;
+}
+
+// ═══════════════════════════════════════
+// ADMIN LOGIN
+// ═══════════════════════════════════════
+function loginAdmin() {
+  const id = document.getElementById('admin-id').value.trim().toUpperCase();
+  const pass = document.getElementById('admin-pass').value.trim();
+  const errEl = document.getElementById('login-error');
+
+  const stall = stalls.find(s => s.id === id && s.pass === pass);
+  if (stall) {
+    currentAdminStallId = stall.id;
+    errEl.style.display = 'none';
+    toast(`Welcome! Managing: ${stall.name} 👋`, 'success');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-staff').classList.add('active');
+    renderStaff();
+  } else {
+    errEl.style.display = 'block';
+  }
+}
+
+function logoutAdmin() {
+  currentAdminStallId = null;
+  toast('Logged out', 'success');
+  goTo('page-landing');
+}
+
+// ═══════════════════════════════════════
+// STAFF DASHBOARD
+// ═══════════════════════════════════════
+function renderStaff() {
+  if (!currentAdminStallId) return;
+  const stall = getStall(currentAdminStallId);
+  const myOrders = stallOrders(currentAdminStallId);
+
+  document.getElementById('dash-stall-name').textContent = (stall ? stall.icon + ' ' + stall.name : '—');
+  document.getElementById('dash-stall-id').textContent = 'ID: ' + currentAdminStallId;
+
+  const waiting   = myOrders.filter(o => o.status === 'waiting').length;
+  const preparing = myOrders.filter(o => o.status === 'preparing').length;
+  const ready     = myOrders.filter(o => o.status === 'ready').length;
+  const served    = myOrders.filter(o => o.status === 'served').length;
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-val" style="color:var(--yellow)">${waiting}</div><div class="stat-label">⏳ Waiting</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--blue)">${preparing}</div><div class="stat-label">🔥 Preparing</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--green)">${ready}</div><div class="stat-label">✅ Ready</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--muted)">${served}</div><div class="stat-label">📦 Served Total</div></div>
+  `;
+  filterStaff(staffFilter);
+}
+
+function filterStaff(filter, btn) {
+  staffFilter = filter;
+  if (btn) {
+    document.querySelectorAll('#staff-tabs .tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const myOrders = stallOrders(currentAdminStallId);
+  let filtered = [...myOrders].reverse();
+  if (filter !== 'all') filtered = filtered.filter(o => o.status === filter);
+
+  const grid = document.getElementById('staff-token-grid');
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="ei">🍽️</div><div>No orders found</div></div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(order => {
+    const elapsed = Math.floor((Date.now() - order.createdAt) / 60000);
+    return `
+    <div class="token-card">
+      <div class="token-header">
+        <div>
+          <div style="font-size:10px;color:var(--muted);">TOKEN</div>
+          <div class="token-num">#${String(order.token).padStart(3,'0')}</div>
+        </div>
+        ${statusBadge(order.status)}
+      </div>
+      <div class="token-meta">
+        <strong>${order.name}</strong>${order.counter ? ' • ' + order.counter : ''}
+        ${order.phone ? ` • 📞 ${order.phone}` : ''}
+        ${order.note ? `<br>📝 ${order.note}` : ''}
+        <br>⏱ ${elapsed < 1 ? 'Just now' : elapsed + ' min ago'}
+      </div>
+      <div class="token-actions">${getActionButtons(order, false)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// TOKEN LOOKUP
+// ═══════════════════════════════════════
+function lookupToken() {
+  const num = parseInt(document.getElementById('scan-input').value);
+  const order = stallOrders(currentAdminStallId).find(o => o.token === num);
+  const resEl = document.getElementById('scan-result');
+  if (!order) { toast('Token not found in your stall', 'error'); resEl.style.display = 'none'; return; }
+  resEl.style.display = 'block';
+  renderScanCard(order);
+}
+
+function renderScanCard(order) {
+  document.getElementById('scan-tok-num').textContent = '#' + String(order.token).padStart(3,'0');
+  document.getElementById('scan-tok-status').innerHTML = statusBadge(order.status);
+  document.getElementById('scan-tok-meta').innerHTML =
+    `<strong>${order.name}</strong> • ${order.counter}` +
+    (order.phone ? ` • 📞 ${order.phone}` : '') +
+    (order.note ? `<br>📝 ${order.note}` : '');
+  document.getElementById('scan-tok-info').textContent = 'Created: ' + new Date(order.createdAt).toLocaleTimeString();
+  document.getElementById('scan-tok-actions').innerHTML = getActionButtons(order, true);
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function statusBadge(status) {
+  const map = {
+    waiting:   ['sb-waiting',   '⏳ Waiting'],
+    preparing: ['sb-preparing', '🔥 Preparing'],
+    ready:     ['sb-ready',     '✅ Ready'],
+    served:    ['sb-served',    '📦 Served'],
+    cancelled: ['sb-cancelled', '❌ Cancelled'],
+  };
+  const [cls, label] = map[status] || ['', ''];
+  return `<span class="status-badge ${cls}" style="font-size:10px;padding:3px 10px;">${label}</span>`;
+}
+
+function getActionButtons(order, isScan) {
+  const oid = order.id;
+  let b = '';
+  if (order.status === 'waiting')   b += `<button class="btn btn-sm btn-blue"  onclick="updateStatus('${oid}','preparing',${isScan})">🔥 Preparing</button>`;
+  if (order.status === 'preparing') b += `<button class="btn btn-sm btn-green" onclick="updateStatus('${oid}','ready',${isScan})">✅ Ready</button>`;
+  if (order.status === 'ready')     b += `<button class="btn btn-sm btn-green" onclick="updateStatus('${oid}','served',${isScan})">📦 Served</button>`;
+  if (['waiting','preparing','ready'].includes(order.status))
+    b += `<button class="btn btn-sm btn-red" onclick="updateStatus('${oid}','cancelled',${isScan})">❌ Cancel</button>`;
+  return b;
+}
+
+function updateStatus(orderId, status, isScan) {
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+  order.status = status;
+  order.updatedAt = Date.now();
+  save();
+
+  const labels = { preparing:'🔥 Preparing', ready:'✅ Ready!', served:'📦 Served', cancelled:'❌ Cancelled' };
+  toast(`Token #${String(order.token).padStart(3,'0')}: ${labels[status]}`, 'success');
+
+  if (isScan) renderScanCard(order);
+  else renderStaff();
+
+  if (status === 'ready') {
+    const ns = document.getElementById('now-serving');
+    ns.style.display = 'block';
+    document.getElementById('now-serving-num').textContent = '#' + String(order.token).padStart(3, '0');
+    document.getElementById('now-serving-name').textContent = order.name + (order.counter ? ' — ' + order.counter : '');
+    setTimeout(() => { ns.style.display = 'none'; }, 8000);
+  }
+}
+
+function toast(msg, type) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || 'success');
+  t.textContent = (type === 'error' ? '❌ ' : '✅ ') + msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// ═══════════════════════════════════════
+// AUTO REFRESH
+// ═══════════════════════════════════════
+setInterval(() => {
+  if (document.getElementById('page-staff').classList.contains('active') && currentAdminStallId) {
+    renderStaff();
+  }
+}, 5000);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('scan-input') === document.activeElement) {
+    lookupToken();
+  }
+});
+</script>
+</body>
+</html>
